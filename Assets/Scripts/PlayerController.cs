@@ -2,7 +2,6 @@ using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Cinemachine;
 using System.Collections;
-using UnityEngine.SceneManagement;
 
 public class PlayerController : MonoBehaviour
 {
@@ -21,11 +20,20 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] private CinemachineCamera m_PlayerCamera;
 
+    private SceneController sceneController;
+
     
-    IEnumerator WaitAndReset()
+    IEnumerator WaitAndSwitchScene(string action)
     {
         yield return new WaitForSeconds(5);
-        SceneManager.LoadScene( SceneManager.GetActiveScene().name );
+        if (action == "win")
+        {
+            sceneController.LoadScene("LevelClearScreen");
+        }
+        if (action == "lose")
+        {
+            sceneController.LoadScene("GameOverScreen");
+        }
     }
 
     void Start()
@@ -37,6 +45,7 @@ public class PlayerController : MonoBehaviour
         freeze = false;
         isInNextLevelZone = false;
         jump = new Vector3(0.0f, 2.0f, 0.0f);
+        sceneController = GameObject.FindWithTag("SceneHandler").GetComponent<SceneController>();
     }
 
     void OnCollisionStay()
@@ -58,7 +67,6 @@ public class PlayerController : MonoBehaviour
         if (other.gameObject.tag == "Lava")
         {
             Die();
-            StartCoroutine(WaitAndReset());
         }
     }
 
@@ -72,14 +80,14 @@ public class PlayerController : MonoBehaviour
         {
             freeze = true;
             m_PlayerCamera.Priority = 11;
-            // StartCoroutine(WaitAndReset());
+            StartCoroutine(WaitAndSwitchScene("win"));
         }
     }
 
     private void Die()
     {
         freeze = true;
-        Debug.Log("Game over");
+        StartCoroutine(WaitAndSwitchScene("lose"));
     }
 
     public void Move()
