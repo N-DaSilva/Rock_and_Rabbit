@@ -6,6 +6,8 @@ TagManager:
   tags:
   - NextLevel
   - Teleporter
+  - Finishline
+  - Lava
   layers:
   - Default
   - TransparentFX

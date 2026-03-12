@@ -1,5 +1,8 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
+using Unity.Cinemachine;
+using System.Collections;
+using UnityEngine.SceneManagement;
 
 public class PlayerController : MonoBehaviour
 {
@@ -16,7 +19,15 @@ public class PlayerController : MonoBehaviour
     private bool isInNextLevelZone;
     private bool freeze;
 
-    // Start is called once before the first execution of Update after the MonoBehaviour is created
+    [SerializeField] private CinemachineCamera m_PlayerCamera;
+
+    
+    IEnumerator WaitAndReset()
+    {
+        yield return new WaitForSeconds(5);
+        SceneManager.LoadScene( SceneManager.GetActiveScene().name );
+    }
+
     void Start()
     {
         rb = GetComponent<Rigidbody>();
@@ -44,6 +55,11 @@ public class PlayerController : MonoBehaviour
         {
             isInNextLevelZone = true;
         }
+        if (other.gameObject.tag == "Lava")
+        {
+            Die();
+            StartCoroutine(WaitAndReset());
+        }
     }
 
     private void OnTriggerExit(Collider other)
@@ -52,13 +68,25 @@ public class PlayerController : MonoBehaviour
         {
             isInNextLevelZone = false;
         }
+        if (other.gameObject.tag == "Finishline")
+        {
+            freeze = true;
+            m_PlayerCamera.Priority = 11;
+            // StartCoroutine(WaitAndReset());
+        }
+    }
+
+    private void Die()
+    {
+        freeze = true;
+        Debug.Log("Game over");
     }
 
     public void Move()
     {
         Vector2 moveValue = moveAction.ReadValue<Vector2>();
         float horizontalMovement = moveValue.x * speed * Time.deltaTime;
-        rb.linearVelocity = new Vector2(horizontalMovement, rb.linearVelocity.y);
+        rb.linearVelocity = new Vector3(horizontalMovement, rb.linearVelocity.y, rb.linearVelocity.z);
     }
 
     public void Jump()
@@ -69,10 +97,8 @@ public class PlayerController : MonoBehaviour
 
     public void JumpToNextLevel()
     {
-        freeze = true;
         rb.AddForce(jump * 17.0f, ForceMode.Impulse);
         isGrounded = false;
-        freeze = false;
     }
 
     void FixedUpdate()
@@ -85,7 +111,7 @@ public class PlayerController : MonoBehaviour
 
     void Update()
     {
-        if(jumpAction.WasPressedThisFrame() && isGrounded)
+        if(jumpAction.WasPressedThisFrame() && isGrounded && !freeze)
         {
             if(isInNextLevelZone)
             {
