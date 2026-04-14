@@ -3,13 +3,13 @@ using UnityEngine;
 public class LavaController : MonoBehaviour
 {
 
-    [SerializeField] private float speed;
+    [SerializeField] private float speed = 0.5f;
 
     void Update()
     {
-        if (this.transform.position.y <= 0f)
+        if (transform.position.y <= 0f)
         {
-            this.transform.position = new Vector3(this.transform.position.x, this.transform.position.y + speed, this.transform.position.z);
+            transform.position += Vector3.up * speed * Time.deltaTime;
         }
     }
 }

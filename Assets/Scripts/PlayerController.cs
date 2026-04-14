@@ -18,14 +18,19 @@ public class PlayerController : MonoBehaviour
     private bool isInNextLevelZone;
     private bool freeze;
 
+    private bool stop;
+    private bool moveLeft;
+    private bool moveRight;
+
     [SerializeField] private CinemachineCamera m_PlayerCamera;
+    private Animator animator;
 
     private SceneController sceneController;
 
     
     IEnumerator WaitAndSwitchScene(string action)
     {
-        yield return new WaitForSeconds(5);
+        yield return new WaitForSeconds(3);
         if (action == "win")
         {
             sceneController.LoadScene("LevelClearScreen");
@@ -40,12 +45,20 @@ public class PlayerController : MonoBehaviour
     {
         rb = GetComponent<Rigidbody>();
         moveAction = InputSystem.actions.FindAction("Move");
+
         jumpAction = InputSystem.actions.FindAction("Jump");
         isGrounded = true;
         freeze = false;
+
+        stop = true;
+        moveLeft = false;
+        moveRight = false;
+
         isInNextLevelZone = false;
         jump = new Vector3(0.0f, 2.0f, 0.0f);
         sceneController = GameObject.FindWithTag("SceneHandler").GetComponent<SceneController>();
+        animator = GetComponent<Animator>();
+        animator.SetBool("isMoving", false);
     }
 
     void OnCollisionStay()
@@ -78,29 +91,91 @@ public class PlayerController : MonoBehaviour
         }
         if (other.gameObject.tag == "Finishline")
         {
-            freeze = true;
-            m_PlayerCamera.Priority = 11;
-            StartCoroutine(WaitAndSwitchScene("win"));
+            Win();
         }
     }
 
     private void Die()
     {
         freeze = true;
+        m_PlayerCamera.Priority = 11;
+        animator.SetBool("isMoving", false);
+        animator.SetTrigger("Lose");
+        rb.rotation = Quaternion.Euler(0, -90, 0);
         StartCoroutine(WaitAndSwitchScene("lose"));
     }
 
-    public void Move()
+    private void Win()
     {
-        Vector2 moveValue = moveAction.ReadValue<Vector2>();
+        freeze = true;
+        m_PlayerCamera.Priority = 11;
+        animator.SetBool("isMoving", false);
+        animator.SetTrigger("Win");
+        rb.rotation = Quaternion.Euler(0, -90, 0);
+        StartCoroutine(WaitAndSwitchScene("win"));
+        
+    }
+
+    public void SwitchMoveRight()
+    {
+        moveRight = true;
+        moveLeft = false;
+        stop = false;
+        animator.SetBool("isMoving", true);
+    }
+
+    public void SwitchMoveLeft()
+    {
+        moveLeft = true;
+        moveRight = false;
+        stop = false;
+        animator.SetBool("isMoving", true);
+    }
+
+    public void SwitchStop()
+    {
+        stop = true;
+        moveLeft = false;
+        moveRight = false;
+
+        animator.SetBool("isMoving", false);
+
+        rb.linearVelocity = new Vector3 (0,0,0);
+    }
+
+    public void MoveFloat(float input)
+    {
+        Vector2 moveValue;
+        moveValue = new Vector2 (input, 0);
+        Move(moveValue);
+    }
+
+    public void Move(Vector2 moveValue)
+    {
+        animator.SetBool("isMoving", Mathf.Abs(moveValue.x) > 0.01f);
+
         float horizontalMovement = moveValue.x * speed * Time.deltaTime;
         rb.linearVelocity = new Vector3(horizontalMovement, rb.linearVelocity.y, rb.linearVelocity.z);
+
+        if (moveValue.x != 0)
+        {
+            float targetRotation = moveValue.x > 0 ? 180f : 0f;
+            Quaternion target = Quaternion.Euler(0, targetRotation, 0);
+
+            rb.rotation = Quaternion.Lerp(rb.rotation, target, 10f * Time.deltaTime);
+        }
     }
 
     public void Jump()
     {
-        rb.AddForce(jump * jumpForce, ForceMode.Impulse);
-        isGrounded = false;
+        if(isInNextLevelZone)
+        {
+            JumpToNextLevel();
+        } else
+        {
+            rb.AddForce(jump * jumpForce, ForceMode.Impulse);
+            isGrounded = false;
+        }
     }
 
     public void JumpToNextLevel()
@@ -113,7 +188,20 @@ public class PlayerController : MonoBehaviour
     {
         if (!freeze)
         {
-            Move();
+            float horizontalInput = moveAction.ReadValue<Vector2>().x;
+
+            if (!stop)
+            {
+               if (moveLeft && !moveRight)
+                {
+                    horizontalInput = -1f;
+                } else if (!moveLeft && moveRight)
+                {
+                    horizontalInput = 1f;
+                } 
+            }
+
+            Move(new Vector2(horizontalInput, 0f));
         }
     }
 
@@ -121,13 +209,7 @@ public class PlayerController : MonoBehaviour
     {
         if(jumpAction.WasPressedThisFrame() && isGrounded && !freeze)
         {
-            if(isInNextLevelZone)
-            {
-                JumpToNextLevel();
-            } else
-            {
-                Jump();
-            }
+            Jump();
         }
     }
 }
