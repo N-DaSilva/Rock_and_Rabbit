@@ -1,6 +1,7 @@
 using UnityEngine;
 using UnityEngine.InputSystem;
 using Unity.Cinemachine;
+using UnityEngine.UI;
 using System.Collections;
 
 public class PlayerController : MonoBehaviour
@@ -24,13 +25,25 @@ public class PlayerController : MonoBehaviour
 
     [SerializeField] private CinemachineCamera m_PlayerCamera;
     private Animator animator;
+    [SerializeField] private AudioClip win_sound;
+    [SerializeField] private AudioClip lose_sound;
+    [SerializeField] private AudioClip footstep_sound;
+    [SerializeField] private float footstepInterval = 0.35f;
+    [SerializeField] private AudioClip jump_sound;
+
+    [SerializeField] private GameObject bgMusic;
+    private AudioSource audioSource;
+    private float nextFootstepTime;
+
+    private Image panel;
+
 
     private SceneController sceneController;
 
     
-    IEnumerator WaitAndSwitchScene(string action)
+    private IEnumerator WaitAndSwitchScene(string action)
     {
-        yield return new WaitForSeconds(3);
+        yield return new WaitForSeconds(4);
         if (action == "win")
         {
             sceneController.LoadScene("LevelClearScreen");
@@ -39,6 +52,35 @@ public class PlayerController : MonoBehaviour
         {
             sceneController.LoadScene("GameOverScreen");
         }
+    }
+
+    private IEnumerator FadePanelIn(float duration)
+    {
+        yield return new WaitForSeconds(3);
+        float elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.deltaTime;
+            panel.color = Color.Lerp(new Color(0, 0, 0, 0f), new Color(0, 0, 0, 1f), elapsedTime / duration);
+            yield return null;
+        }
+
+        panel.color = new Color(0, 0, 0, 1f);
+    }
+
+    private IEnumerator FadePanelOut(float duration)
+    {
+        float elapsedTime = 0f;
+
+        while (elapsedTime < duration)
+        {
+            elapsedTime += Time.deltaTime;
+            panel.color = Color.Lerp(new Color(0, 0, 0, 1f), new Color(0, 0, 0, 0f), elapsedTime / duration);
+            yield return null;
+        }
+
+        panel.color = new Color(0, 0, 0, 0f);
     }
 
     void Start()
@@ -59,6 +101,10 @@ public class PlayerController : MonoBehaviour
         sceneController = GameObject.FindWithTag("SceneHandler").GetComponent<SceneController>();
         animator = GetComponent<Animator>();
         animator.SetBool("isMoving", false);
+        audioSource = bgMusic.GetComponent<AudioSource>();
+        panel = GameObject.FindWithTag("Panel").GetComponent<Image>();
+
+        StartCoroutine(FadePanelOut(0.2f));
     }
 
     void OnCollisionStay()
@@ -79,6 +125,7 @@ public class PlayerController : MonoBehaviour
         }
         if (other.gameObject.tag == "Lava")
         {
+            audioSource.volume = Mathf.Lerp(0.25f, 0f, Time.time);
             Die();
         }
     }
@@ -91,6 +138,7 @@ public class PlayerController : MonoBehaviour
         }
         if (other.gameObject.tag == "Finishline")
         {
+            audioSource.volume = Mathf.Lerp(0.25f, 0f, Time.time);
             Win();
         }
     }
@@ -98,20 +146,30 @@ public class PlayerController : MonoBehaviour
     private void Die()
     {
         freeze = true;
+        rb.linearVelocity = new Vector3 (0,0,0);
+        rb.rotation = Quaternion.Euler(0, -90, 0);
+
         m_PlayerCamera.Priority = 11;
         animator.SetBool("isMoving", false);
+        AudioSource.PlayClipAtPoint(lose_sound, transform.position);
         animator.SetTrigger("Lose");
-        rb.rotation = Quaternion.Euler(0, -90, 0);
+
+        StartCoroutine(FadePanelIn(1f));
         StartCoroutine(WaitAndSwitchScene("lose"));
     }
 
     private void Win()
     {
         freeze = true;
+        rb.linearVelocity = new Vector3 (0,0,0);
+        rb.rotation = Quaternion.Euler(0, -90, 0);
+
         m_PlayerCamera.Priority = 11;
         animator.SetBool("isMoving", false);
+        AudioSource.PlayClipAtPoint(win_sound, transform.position);
         animator.SetTrigger("Win");
-        rb.rotation = Quaternion.Euler(0, -90, 0);
+
+        StartCoroutine(FadePanelIn(1f));
         StartCoroutine(WaitAndSwitchScene("win"));
         
     }
@@ -152,10 +210,17 @@ public class PlayerController : MonoBehaviour
 
     public void Move(Vector2 moveValue)
     {
-        animator.SetBool("isMoving", Mathf.Abs(moveValue.x) > 0.01f);
+        bool isMoving = Mathf.Abs(moveValue.x) > 0.01f;
+        animator.SetBool("isMoving", isMoving);
 
         float horizontalMovement = moveValue.x * speed * Time.deltaTime;
         rb.linearVelocity = new Vector3(horizontalMovement, rb.linearVelocity.y, rb.linearVelocity.z);
+
+        if (isMoving && isGrounded && Time.time >= nextFootstepTime)
+        {
+            AudioSource.PlayClipAtPoint(footstep_sound, new Vector3 (transform.position.x, transform.position.y, -10.5f));
+            nextFootstepTime = Time.time + footstepInterval;
+        }
 
         if (moveValue.x != 0)
         {
@@ -168,6 +233,7 @@ public class PlayerController : MonoBehaviour
 
     public void Jump()
     {
+        AudioSource.PlayClipAtPoint(jump_sound, transform.position);
         if(isInNextLevelZone)
         {
             JumpToNextLevel();

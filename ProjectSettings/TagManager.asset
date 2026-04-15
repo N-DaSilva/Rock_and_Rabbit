@@ -9,6 +9,7 @@ TagManager:
   - Finishline
   - Lava
   - SceneHandler
+  - Panel
   layers:
   - Default
   - TransparentFX
